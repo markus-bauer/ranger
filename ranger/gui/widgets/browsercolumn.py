@@ -8,10 +8,13 @@ from __future__ import (absolute_import, division, print_function)
 import curses
 import stat
 from time import time
+from math import ceil
 from os.path import splitext
 
-from ranger.ext.widestring import WideString
+from ranger.container.settings import THUMB_WIDTH, THUMB_HEIGHT
 from ranger.core import linemode
+from ranger.ext.img_display import get_cell_dimensions
+from ranger.ext.widestring import WideString
 
 from . import Widget
 from .pager import Pager
@@ -19,6 +22,23 @@ from .pager import Pager
 
 def hook_before_drawing(fsobject, color_list):
     return fsobject, color_list
+
+
+def get_thumbnail_dimensions():
+    """ Returns thumbnail dimensions as
+    (width in pixels,
+    height in pixels,
+    number of cols,
+    number of rows)
+    """
+    # TODO(markus) get_cell_dimensions can return zeros, and this would fail.
+    # But kitty promises to always return valid dimensions (I think).
+    # This should only be an issue for other terminal emulators.
+
+    cell_hei, cell_wid = get_cell_dimensions()
+    thumb_cols = ceil(THUMB_WIDTH / cell_wid)
+    thumb_rows = ceil(THUMB_HEIGHT / cell_hei)
+    return (THUMB_WIDTH, THUMB_HEIGHT, thumb_cols, thumb_rows)
 
 
 class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
@@ -53,9 +73,33 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
 
         self.settings.signal_bind('setopt.display_size_in_main_column',
                                   self.request_redraw, weak=True)
+        self.settings.signal_bind('setopt.draw_borders', self.clear_thumbnails)
+
+        # The x position (in cols) of the last drawn thumbnails
+        # (this is used to clear all thumbnails that were previously drawn):
+        self.thumbnail_x_pos = None
 
     def request_redraw(self):
         self.need_redraw = True
+
+    def has_thumbnails(self):
+        if (
+            self.settings.show_thumbnails
+            and self.fm.image_displayer.supports_thumbnails()
+            # don't draw thumbnails in parent column:
+            and (self.level >= 0)
+        ):
+            (_, _, thumb_cols, _) = get_thumbnail_dimensions()
+            # Only draw thumbnails if there's enough space:
+            # TODO(markus): what's a reasonable minimum size?
+            return self.wid > (thumb_cols + 10)
+        else:
+            return False
+
+    def clear_thumbnails(self):
+        if self.thumbnail_x_pos is not None:
+            self.fm.image_displayer.clear_column(self.thumbnail_x_pos + 1)
+            self.thumbnail_x_pos = None
 
     def click(self, event):     # pylint: disable=too-many-branches
         """Handle a MouseEvent"""
@@ -68,7 +112,12 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
 
         elif self.target.is_directory:
             if self.target.accessible and self.target.content_loaded:
-                index = self.scroll_begin + event.y - self.y
+                if self.has_thumbnails():
+                    # Correct the mouse cursor position for thumbnail y offset:
+                    (_, _, _, thumb_rows) = get_thumbnail_dimensions()
+                    index = self.scroll_begin + int((event.y - self.y)/thumb_rows)
+                else:
+                    index = self.scroll_begin + event.y - self.y
 
                 if direction:
                     if self.level == -1:
@@ -176,6 +225,14 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
                 self.need_redraw |= self.last_redraw_time < target.last_load_time
 
         if self.need_redraw:
+            # Clear the previously drawn thumbnails in this column.
+            # we need to clear:
+            # - if there's no target
+            # - if the target is a file
+            # - if the target is a dir (because we redraw them anyway)
+            # -> So we clear them every time.
+            self.clear_thumbnails()
+
             self.win.erase()
             if target is None:
                 pass
@@ -224,13 +281,16 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
 
         return linum_format.format(line_number)
 
-    def _draw_directory(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-            self):
-        """Draw the contents of a directory"""
+    def _clear_image(self):
         if self.image:
             self.image = None
             self.need_clear_image = True
             Pager.clear_image(self)
+
+    def _draw_directory(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+            self):
+        """Draw the contents of a directory"""
+        self._clear_image()
 
         if self.level > 0 and not self.settings.preview_directories:
             return
@@ -269,23 +329,64 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
             self.color_reset()
             return
 
-        self._set_scroll_begin()
-
-        copied = [f.path for f in self.fm.copy_buffer]
-
         # Set the size of the linum text field to the number of digits in the
         # visible files in directory.
         linum_text_len = len(str(self.scroll_begin + self.hei))
         linum_format = "{0:>" + str(linum_text_len) + "}"
 
+        # -- thumbnails --
+        thumbnails = self.has_thumbnails()
+
+        if thumbnails:
+            (thumb_wid, thumb_hei, thumb_cols, thumb_rows) = get_thumbnail_dimensions()
+            y_line_step = thumb_rows
+            corrected_hei = int(self.hei/thumb_rows)
+
+            # thumb position:
+            if self.settings.line_numbers != 'false' and self.main_column:
+                # put thumbnail to the right of the line number:
+                self.thumbnail_x_pos = self.x + linum_text_len
+            else:
+                # no line number:
+                self.thumbnail_x_pos = self.x
+        else:
+            y_line_step = 1
+            corrected_hei = self.hei
+            self.thumbnail_x_pos = None
+        # ----------------
+
+        self._set_scroll_begin(corrected_hei)
+
+        copied = [f.path for f in self.fm.copy_buffer]
+
         selected_i = self._get_index_of_selected_file()
-        for line in range(self.hei):
-            i = line + self.scroll_begin
+
+        for line_i in range(corrected_hei):
+            i = line_i + self.scroll_begin
+            line = line_i * y_line_step
 
             try:
                 drawn = self.target.files[i]
             except IndexError:
                 break
+
+            # -- draw thumbnails
+            # Thumbnails are redrawn every time.
+            # TODO(markus): is x_offset the best way to do this?
+            # - shift start of text to the right of the thumbnail.
+            # - x_offset should be dynamic: only shift if this line has thumb.
+            # - we need to save display_data line specific to this offset.
+            x_offset = 0
+            if thumbnails:
+                thumb = self.fm.get_thumbnail(drawn)
+                if thumb:
+                    # NOTE(markus):
+                    # These draw in absolute coordinates (not relative to this win).
+                    self.fm.image_displayer.draw_thumbnail(
+                        thumb, self.thumbnail_x_pos, self.y + line, thumb_wid, thumb_hei
+                    )
+                    x_offset = thumb_cols
+            # ------------------
 
             tagged = self.fm.tags and drawn.realpath in self.fm.tags
             if tagged:
@@ -307,7 +408,9 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
                    drawn.path in copied, tagged_marker, drawn.infostring,
                    drawn.vcsstatus, drawn.vcsremotestatus, self.target.has_vcschild,
                    self.fm.do_cut, current_linemode.name, metakey, active_pane,
-                   self.settings.line_numbers)
+                   self.settings.line_numbers,
+                   # NOTE(markus): The line will be different for different x_offsets:
+                   x_offset)
 
             # Check if current line has not already computed and cached
             if key in drawn.display_data:
@@ -350,6 +453,12 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
                     space -= 1
                     # add separator between line number and tag
                     predisplay_left.append([' ', []])
+
+            # -- thumbnails --
+            # Shift the start of the text to the right if there was a thumbnail:
+            if thumbnails and (x_offset > 0):
+                predisplay_left.append([' '*x_offset, []])
+                space -= x_offset
 
             # selection mark
             tagmark = self._draw_tagged_display(tagged, tagged_marker)
@@ -505,11 +614,10 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
 
         return this_color
 
-    def _get_scroll_begin(self):  # pylint: disable=too-many-return-statements
+    def _get_scroll_begin(self, winsize):  # pylint: disable=too-many-return-statements
         """Determines scroll_begin (the position of the first displayed file)"""
         offset = self.settings.scroll_offset
         dirsize = len(self.target)
-        winsize = self.hei
         halfwinsize = winsize // 2
         index = self._get_index_of_selected_file() or 0
         original = self.target.scroll_begin
@@ -542,9 +650,9 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
 
         return original
 
-    def _set_scroll_begin(self):
+    def _set_scroll_begin(self, winsize):
         """Updates the scroll_begin value"""
-        self.scroll_begin = self._get_scroll_begin()
+        self.scroll_begin = self._get_scroll_begin(winsize)
         self.target.scroll_begin = self.scroll_begin
 
     def scroll(self, n):
@@ -555,3 +663,10 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
 
     def __str__(self):
         return self.__class__.__name__ + ' at level ' + str(self.level)
+
+    def destroy(self):
+        # This handles the clearing of thumbnails when the viewmode changes or
+        # when multipane rebuilds the layout.
+        # TODO(markus): is this a valid way to add to destroy?
+        self.clear_thumbnails()
+        super().destroy()

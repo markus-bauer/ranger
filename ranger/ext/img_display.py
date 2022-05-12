@@ -67,6 +67,15 @@ def move_cur(to_y, to_x):
     bin_stdout.write(tparm)
 
 
+# NOTE(markus): There were some bugs in the existing Kitty code that I fixed (or at least changed)
+def get_cell_dimensions():
+    """Gets cell dimensions in pixels."""
+    ret = fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ, struct.pack("HHHH", 0, 0, 0, 0))
+    # NOTE(markus): Bugfix.
+    n_rows, n_cols, x_px_tot, y_px_tot = struct.unpack("HHHH", ret)
+    pix_row, pix_col = y_px_tot // n_rows, x_px_tot // n_cols
+    return (pix_row, pix_col)
+
 class ImageDisplayError(Exception):
     pass
 
@@ -121,6 +130,21 @@ class ImageDisplayer(object):
 
     def quit(self):
         """Cleanup and close"""
+
+    def supports_thumbnails(self):
+        return False
+
+    def draw_thumbnail(self, path, start_x, start_y, width, height):
+        """Draw thumbnail, if supported.
+        Generally, this just draws an image, but some implementations
+        might have special code. That's why this is its own function."""
+        raise NotImplementedError
+
+    def clear_column(self, col):
+        """TODO(markus):
+        This is the best way to clear all thumbnails in a browsercolumn with kitty.
+        Don't know how to generalize this for all displayers."""
+        raise NotImplementedError
 
 
 @register_image_displayer("w3m")
@@ -610,11 +634,42 @@ class KittyImageDisplayer(ImageDisplayer, FileManagerAware):
             # replicate the functionality we use from im
 
         # get dimensions of a cell in pixels
-        ret = fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ,
-                          struct.pack('HHHH', 0, 0, 0, 0))
-        n_cols, n_rows, x_px_tot, y_px_tot = struct.unpack('HHHH', ret)
-        self.pix_row, self.pix_col = x_px_tot // n_rows, y_px_tot // n_cols
+        self.pix_row, self.pix_col = get_cell_dimensions()
         self.needs_late_init = False
+
+    def supports_thumbnails(self):
+        return True
+
+    def draw_thumbnail(self, path, start_x, start_y, width, height):
+        if self.needs_late_init:
+            self._late_init()
+
+        # a=T: transmit and show
+        # z<0: draw the image behind text
+        # t=f: draw the file directly
+        # f=100: draw as png
+        cmds = ({'a': 'T', 'z': -2, 't': 'f', 'f': 100, 's': width, 'v': height})
+
+        payload = base64.standard_b64encode(path.encode(self.fsenc))
+
+        with temporarily_moved_cursor(int(start_y), int(start_x)):
+            for cmd_str in self._format_cmd_str(cmds, payload=payload):
+                self.stdbout.write(cmd_str)
+
+        self.fm.ui.win.redrawwin()
+
+    def clear_column(self, col):
+        # delete all images in a column:
+        cmds = ({'a': 'd', 'd': 'X', 'x': col})
+
+        for cmd_str in self._format_cmd_str(cmds):
+            self.stdbout.write(cmd_str)
+
+        # TODO(markus): Switching to taskview and back causes weird drawing of borders.
+        # But only when thumbnails are active.
+        # Adding redrawwin gets rid of this. (also in draw_thumbnail)
+        self.fm.ui.win.redrawwin()
+
 
     def draw(self, path, start_x, start_y, width, height):
         self.image_id += 1
@@ -636,7 +691,9 @@ class KittyImageDisplayer(ImageDisplayer, FileManagerAware):
             # doesn't stop the image from displaying
             # if warn:
             #     raise ImageDisplayError(str(warn[-1].message))
-        box = (width * self.pix_row, height * self.pix_col)
+
+        # NOTE(markus): BUGFIX
+        box = (width * self.pix_col, height * self.pix_row)
 
         if image.width > box[0] or image.height > box[1]:
             scale = min(box[0] / image.width, box[1] / image.height)
@@ -683,19 +740,13 @@ class KittyImageDisplayer(ImageDisplayer, FileManagerAware):
             raise ImageDisplayError('kitty replied "{r}"'.format(r=resp))
 
     def clear(self, start_x, start_y, width, height):
-        # let's assume that every time ranger call this
-        # it actually wants just to remove the previous image
-        # TODO: implement this using the actual x, y, since the protocol
-        #       supports it
-        cmds = {'a': 'd', 'i': self.image_id}
-        for cmd_str in self._format_cmd_str(cmds):
-            self.stdbout.write(cmd_str)
-        self.stdbout.flush()
-        # kitty doesn't seem to reply on deletes, checking like we do in draw()
-        # will slows down scrolling with timeouts from select
+        # NOTE(markus): I now use clear_column to clear this image.
         self.image_id = max(0, self.image_id - 1)
-        self.fm.ui.win.redrawwin()
-        self.fm.ui.win.refresh()
+        self.clear_column(start_x + 1)
+
+        # NOTE(markus): Disabled refresh. Don't know if this was ever necessary.
+        # Disabling it removes flicker and issues with borders and hint menu.
+        # But redrawwin is required (called in clear_column)
 
     def _format_cmd_str(self, cmd, payload=None, max_slice_len=2048):
         central_blk = ','.join(["{k}={v}".format(k=k, v=v)

@@ -20,6 +20,13 @@ SIGNAL_PRIORITY_BETWEEN = 0.6  # sanitized signal.value, old fm.settings.XYZ
 SIGNAL_PRIORITY_SYNC = 0.2  # (Internal) updating fm.settings.XYZ
 SIGNAL_PRIORITY_AFTER_SYNC = 0.1  # after fm.settings.XYZ was updated
 
+# Pixel size of thumbnails
+# TODO(markus): Where to put these?
+# TODO(markus): Cached images would have to be deleted/replaced when size changes.
+#               Or: hash with size.
+THUMB_WIDTH = 60
+THUMB_HEIGHT = 60
+
 
 ALLOWED_SETTINGS = {
     'automatically_count_files': bool,
@@ -74,9 +81,10 @@ ALLOWED_SETTINGS = {
     'scroll_offset': int,
     'shorten_title': int,
     'show_cursor': bool,  # TODO: not working?
-    'show_hidden_bookmarks': bool,
     'show_hidden': bool,
+    'show_hidden_bookmarks': bool,
     'show_selection_in_titlebar': bool,
+    'show_thumbnails': bool,
     'sort_case_insensitive': bool,
     'sort_directories_first': bool,
     'sort_reverse': bool,

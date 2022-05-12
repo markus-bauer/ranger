@@ -352,6 +352,12 @@ class UI(  # pylint: disable=too-many-instance-attributes,too-many-public-method
         self.win.redrawwin()
         self.need_redraw = True
 
+    def redraw_after_viewmode_change(self):
+        self.win.erase()
+        self.win.redrawwin()
+        # No refresh!
+        self.need_redraw = True
+
     def update_size(self):
         """resize all widgets"""
         self.termsize = self.win.getmaxyx()
@@ -419,7 +425,7 @@ class UI(  # pylint: disable=too-many-instance-attributes,too-many-public-method
         self.browser.visible = True
 
     def open_pager(self):
-        self.browser.columns[-1].clear_image(force=True)
+        self.browser.clear_all_images()
         if self.console.focused:
             self.console.focused = False
         self.pager.open()
@@ -450,7 +456,7 @@ class UI(  # pylint: disable=too-many-instance-attributes,too-many-public-method
         self.close_pager()
 
     def open_taskview(self):
-        self.browser.columns[-1].clear_image(force=True)
+        self.browser.clear_all_images()
         self.pager.close()
         self.pager.visible = False
         self.pager.focused = False
@@ -567,7 +573,13 @@ class UI(  # pylint: disable=too-many-instance-attributes,too-many-public-method
                     new_browser.resize(*old_size)
 
                 self.browser = new_browser
-                self.redraw_window()
+                # NOTE(markus): I removed this and replaced it.
+                # redrawwin and refresh are handled in self.redraw anyway.
+                # Having redrawwin and refresh here causes issues.
+                # I think there should be only one refresh per cycle.
+                # I hope this works.
+                # self.redraw_window()
+                self.redraw_after_viewmode_change()
         else:
             raise ValueError("Attempting to set invalid viewmode `%s`, should "
                              "be one of `%s`." % (value, "`, `".join(self.ALLOWED_VIEWMODES)))

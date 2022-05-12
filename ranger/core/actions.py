@@ -24,7 +24,12 @@ import ranger
 from ranger import PY3
 from ranger.container.directory import Directory
 from ranger.container.file import File
-from ranger.container.settings import ALLOWED_SETTINGS, ALLOWED_VALUES
+from ranger.container.settings import (
+    ALLOWED_SETTINGS,
+    ALLOWED_VALUES,
+    THUMB_WIDTH,
+    THUMB_HEIGHT,
+)
 from ranger.core.loader import CommandLoader, CopyLoader
 from ranger.core.shared import FileManagerAware, SettingsAware
 from ranger.core.tab import Tab
@@ -69,6 +74,7 @@ class Actions(  # pylint: disable=too-many-instance-attributes,too-many-public-m
         """
         old_path = self.thisdir.path
         self.previews = {}
+        self.thumbnails = {}
         self.garbage_collect(-1)
         self.enter_dir(old_path)
         self.change_mode('normal')
@@ -1027,19 +1033,20 @@ class Actions(  # pylint: disable=too-many-instance-attributes,too-many-public-m
     def update_preview(self, path):
         try:
             del self.previews[path]
+            del self.thumbnails[path]
         except KeyError:
             return False
         self.ui.need_redraw = True
         return True
 
     @staticmethod
-    def sha512_encode(path, inode=None):
+    def sha512_encode(path, inode=None, extension="jpg"):
         if inode is None:
             inode = stat(path).st_ino
         inode_path = "{0}{1}".format(str(inode), path)
         if PY3:
             inode_path = inode_path.encode('utf-8', 'backslashreplace')
-        return '{0}.jpg'.format(sha512(inode_path).hexdigest())
+        return '{0}.{1}'.format(sha512(inode_path).hexdigest(), extension)
 
     def get_preview(self, fobj, width, height):
         # pylint: disable=too-many-return-statements,too-many-statements
@@ -1183,6 +1190,101 @@ class Actions(  # pylint: disable=too-many-instance-attributes,too-many-public-m
             read=True,
             silent=True,
             descr="Getting preview of %s" % path,
+        )
+        loadable.signal_bind('after', on_after)
+        loadable.signal_bind('destroy', on_destroy)
+        self.loader.add(loadable)
+
+        return None
+
+    def get_thumbnail(self, fobj):
+        # Don't call this function when you shouldn't:
+        assert self.settings.show_thumbnails
+
+        path = fobj.realpath
+
+        if (not path) or (not os.path.exists(path)):
+            return None
+
+        # -- thumbnail dict is a 2d dict, similar to previews.
+        # For every entry, there has 3 keys:
+        #  thumbnail["path"]["loading"] = bool
+        #  thumbnail["path"]["failed"] = bool
+        #  thumbnail["path"]["thumbnail"] = "path/to/thumbnail.png"
+
+        # -- Look for an existing entry for this path:
+        try:
+            data = self.thumbnails[path]
+        except KeyError:
+            data = self.thumbnails[path] = {'loading': False, 'failed': False}
+
+        try:
+            return data['thumbnail']
+        except KeyError:
+            if data['loading']:
+                return None
+            elif data['failed']:
+                return None
+
+        # -- Else: Look for an existing thumbnail image on disk:
+
+        data['loading'] = True
+
+        cachedir = os.path.join(ranger.args.cachedir, "thumbnails")
+        if not os.path.exists(cachedir):
+            os.makedirs(cachedir)
+
+        fobj.load_if_outdated()
+        cacheimg = os.path.join(
+            cachedir,
+            self.sha512_encode(path, inode=fobj.stat.st_ino, extension="png")
+        )
+
+        # TODO(markus): Should I check mtime here, or add mtime to the hash?
+        # TODO(markus): I also need to make sure that the thumbnail size
+        #               is still the same as in the settings. -> wid+hei in the hash?
+        if (os.path.isfile(cacheimg) and
+                fobj.stat.st_mtime <= os.path.getmtime(cacheimg)):
+            data['loading'] = False
+            data['failed'] = False
+            data['thumbnail'] = cacheimg
+            return cacheimg
+
+        # -- Else: (Try to) Create a new thumbnail:
+
+        def on_after(signal):
+            rcode = signal.process.poll()
+
+            data['loading'] = False
+            if rcode == 0:
+                data['failed'] = False
+                data['thumbnail'] = cacheimg
+                # TODO(markus): redraw the entire browser?
+                self.ui.browser.request_redraw()
+            elif rcode == 1:
+                data['failed'] = True
+            else:
+                # This should not be possible
+                raise NotImplementedError
+
+        def on_destroy(signal):
+            try:
+                del self.thumbnails[path]
+            except KeyError:
+                pass
+
+        # This calls the thumbnail script.
+        # TODO(markus):
+        # - For now the path to the script is hardcoded.
+        # - I also don't check if it exists or if it's executable.
+        loadable = CommandLoader(
+            args=[
+                self.fm.relpath('data/thumbnail.sh'),
+                path, cacheimg, str(THUMB_WIDTH), str(THUMB_HEIGHT)
+            ],
+            read=True,
+            silent=True,
+            descr="Creating thumbnail for {}".format(path),
         )
         loadable.signal_bind('after', on_after)
         loadable.signal_bind('destroy', on_destroy)

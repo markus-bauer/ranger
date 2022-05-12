@@ -42,9 +42,12 @@ class ViewMultipane(ViewBase):  # pylint: disable=too-many-ancestors
     def rebuild(self):
         self.columns = []
 
-        for child in self.container:
+        # NOTE(markus): bug fix: https://github.com/ranger/ranger/issues/2624
+        old_children = list(self.container)
+        for child in old_children:
             self.remove_child(child)
             child.destroy()
+        assert(len(self.container) == 0)
         for name, tab in self.fm.tabs.items():
             column = BrowserColumn(self.win, 0, tab=tab)
             column.main_column = True
@@ -54,6 +57,9 @@ class ViewMultipane(ViewBase):  # pylint: disable=too-many-ancestors
             self.columns.append(column)
             self.add_child(column)
         self.resize(self.y, self.x, self.hei, self.wid)
+
+    def request_redraw(self):
+        self.need_redraw = True
 
     def draw(self):
         if self.need_clear:
@@ -153,3 +159,12 @@ class ViewMultipane(ViewBase):  # pylint: disable=too-many-ancestors
         if self.old_draw_borders != self._draw_borders_setting():
             self.resize(self.y, self.x, self.hei, self.wid)
             self.old_draw_borders = self._draw_borders_setting()
+
+    def clear_thumbnails(self):
+        if self.columns:
+            for column in self.columns:
+                column.clear_thumbnails()
+
+    def clear_all_images(self):
+        if self.fm.settings.show_thumbnails:
+            self.clear_thumbnails()

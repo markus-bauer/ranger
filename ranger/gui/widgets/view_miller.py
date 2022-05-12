@@ -87,6 +87,9 @@ class ViewMiller(ViewBase):  # pylint: disable=too-many-ancestors,too-many-insta
         if self.settings.draw_borders:
             self.request_clear()
 
+    def request_redraw(self):
+        self.need_redraw = True
+
     def draw(self):
         if self.need_clear:
             self.win.erase()
@@ -281,11 +284,21 @@ class ViewMiller(ViewBase):  # pylint: disable=too-many-ancestors,too-many-insta
             self.columns[-1].visible = True
 
         if self.preview and self.is_collapsed != self._collapse():
-            if self.fm.settings.preview_files:
-                # force clearing the image when resizing preview column
-                self.columns[-1].clear_image(force=True)
+            # force clearing all images when resizing preview column:
+            self.clear_all_images()
             self.resize(self.y, self.x, self.hei, self.wid)
 
         if self.old_draw_borders != self.settings.draw_borders:
             self.resize(self.y, self.x, self.hei, self.wid)
             self.old_draw_borders = self.settings.draw_borders
+
+    def clear_thumbnails(self):
+        if self.columns:
+            for column in self.columns:
+                column.clear_thumbnails()
+
+    def clear_all_images(self):
+        if self.fm.settings.preview_files:
+            self.columns[-1].clear_image(force=True)
+        if self.fm.settings.show_thumbnails:
+            self.clear_thumbnails()
