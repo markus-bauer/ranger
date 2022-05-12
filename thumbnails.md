@@ -17,7 +17,7 @@ Add this to rc.conf to toggle between the modes:
 map zt set show_thumbnails!
 ```
 
-Thumbnails are created with the script `ranger/data/thumbnails.sh` (similar to scope.sh).
+Thumbnails are created with the script `ranger/data/thumbnail.sh` (similar to scope.sh).
 It uses convert, so imagemagick has to be installed. For audio and videos it uses ffmpeg and ffmpegthumbnailer (like scope.sh).
 At the moment the path to the script is hard coded.
 
