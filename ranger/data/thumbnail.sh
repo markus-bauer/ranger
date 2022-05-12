@@ -7,7 +7,7 @@ IFS=$'\n'
 ## -----------------------------------------
 ##
 ## Exit codes:
-## 0: success   
+## 0: success
 ## 1: no success
 ##
 ## Arguments:
@@ -34,7 +34,7 @@ case "${MIMETYPE}" in
         create_thumbnail "${FILE_PATH}" "${IMAGE_CACHE_PATH}" && exit 0;;
 
     video/*)
-        ffmpegthumbnailer -i "${FILE_PATH}" -o "${IMAGE_CACHE_PATH}" -s 0 && 
+        ffmpegthumbnailer -i "${FILE_PATH}" -o "${IMAGE_CACHE_PATH}" -s 0 &&
         create_thumbnail "${IMAGE_CACHE_PATH}" "${IMAGE_CACHE_PATH}" &&
         exit 0;;
 
