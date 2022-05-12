@@ -1,6 +1,6 @@
 # Experiment: Thumbnails in ranger.
 
-This is just an experiment. It might work, but it's not intended to be final or generally usable. 
+This is just an experiment. It might work, but it's not intended to be final or generally usable.
 
 The issue is tracked here:
 https://github.com/ranger/ranger/issues/2224
@@ -25,7 +25,7 @@ The thumbnails are saved in the default ranger cachedir (generally this is `~/.c
 The dir should be created automatically.
 Thumbnails are never deleted.
 
-The thumbnail size is hard coded. And, currently, thumbnails are not remade when you change the size. 
+The thumbnail size is hard coded. And, currently, thumbnails are not remade when you change the size.
 Although they should be updated if the source file changes.
 Note also, that if you delete the thumbnails while ranger is running, they will not be remade (I don't check for this currently).
 
@@ -35,7 +35,8 @@ So once those files have been created the drawing is more or less immediate.
 The existing image preview is not that great. Some of the biggest issues I found are
 with existing code. So if you have issues, first disable the image preview (zi or zp).
 
---- 
+---
+
 Todo/Tests:
 - [x] Thumbnails in main column, preview column, and multipane.
 - [x] update when toggling show_thumbnail
@@ -49,7 +50,7 @@ Todo/Tests:
 - [x] switching to pager/taskview
     - handled by browser.clear_all_images(), called in ui.open_pager/open_taskview.
 - [x] drawing borders
-    - handled with binding to setopt 
+    - handled with binding to setopt
     - I think this works
 - [x] thumbnail script
 - [ ] switching to other image display method should just work.
@@ -64,8 +65,8 @@ Todo/Tests:
     - handled like previews, in actions.update_preview()
     - I think this works
 - [ ] resizing window
-    - [x] position is correct 
-    - [x] don't draw thumbs if window is too small. 
+    - [x] position is correct
+    - [x] don't draw thumbs if window is too small.
     - [ ] problem: thumbs are not being redrawn immediately after resize, but only after input.
 - [ ] changing thumbnail size (size is currently hardcoded)
 - [ ] changing thumbnail script location
