@@ -637,7 +637,7 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
 
         if original > dirsize - winsize:
             self.target.scroll_begin = dirsize - winsize
-            return self._get_scroll_begin()
+            return self._get_scroll_begin(winsize)
 
         if lower_limit < projected < upper_limit:
             return original
