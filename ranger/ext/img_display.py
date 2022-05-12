@@ -655,6 +655,7 @@ class KittyImageDisplayer(ImageDisplayer, FileManagerAware):
         with temporarily_moved_cursor(int(start_y), int(start_x)):
             for cmd_str in self._format_cmd_str(cmds, payload=payload):
                 self.stdbout.write(cmd_str)
+            self.stdbout.flush()
 
         self.fm.ui.win.redrawwin()
 
@@ -664,6 +665,7 @@ class KittyImageDisplayer(ImageDisplayer, FileManagerAware):
 
         for cmd_str in self._format_cmd_str(cmds):
             self.stdbout.write(cmd_str)
+        self.stdbout.flush()
 
         # TODO(markus): Switching to taskview and back causes weird drawing of borders.
         # But only when thumbnails are active.

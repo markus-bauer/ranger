@@ -36,6 +36,7 @@ def get_thumbnail_dimensions():
     # This should only be an issue for other terminal emulators.
 
     cell_hei, cell_wid = get_cell_dimensions()
+    assert (cell_hei > 0) and (cell_wid > 0)
     thumb_cols = ceil(THUMB_WIDTH / cell_wid)
     thumb_rows = ceil(THUMB_HEIGHT / cell_hei)
     return (THUMB_WIDTH, THUMB_HEIGHT, thumb_cols, thumb_rows)
@@ -352,7 +353,6 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
         else:
             y_line_step = 1
             corrected_hei = self.hei
-            self.thumbnail_x_pos = None
         # ----------------
 
         self._set_scroll_begin(corrected_hei)
