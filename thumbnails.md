@@ -6,7 +6,7 @@ The issue is tracked here:
 https://github.com/ranger/ranger/issues/2224
 
 It only works with kitty (or the kitty protocol, to be more precise).
-To try it out you have to use kitty and turn on the settings:
+To try it, you have to use kitty, and turn on the settings:
 ```
 set preview_images_method kitty
 set show_thumbnails True
@@ -18,7 +18,7 @@ map zt set show_thumbnails!
 ```
 
 Thumbnails are created with the script `ranger/data/thumbnails.sh` (similar to scope.sh).
-It uses convert, so imagemagick has to be installed.
+It uses convert, so imagemagick has to be installed. For audio and videos it uses ffmpeg and ffmpegthumbnailer (like scope.sh).
 At the moment the path to the script is hard coded.
 
 The thumbnails are saved in the default ranger cachedir (generally this is `~/.cache/ranger/thumbnails`).
@@ -51,6 +51,7 @@ Todo/Tests:
 - [x] drawing borders
     - handled with binding to setopt 
     - I think this works
+- [x] thumbnail script
 - [ ] switching to other image display method should just work.
     - [ ] (tested and looks okay, but not sure)
 - [ ] correction for scrollbegin
@@ -67,6 +68,7 @@ Todo/Tests:
     - [x] don't draw thumbs if window is too small. 
     - [ ] problem: thumbs are not being redrawn immediately after resize, but only after input.
 - [ ] changing thumbnail size (size is currently hardcoded)
+- [ ] changing thumbnail script location
 - [ ] Bug: when changing viewmode, the tabs (in titlebar) are not drawn.
     - Probably related to redrawwin and refesh when calling ui.redraw_window, in ui._set_viewmode
     - I changed this. And it looks okay. I hope this doesn't break other things.
@@ -76,7 +78,7 @@ Todo/Tests:
 - [ ] TODOs in code
 - [ ] I changed some stuff in the Kitty displayer. Does this still work like before?
     - it looks okay, but needs more testing.
-- [x] thumbnail script
+- [ ] better thumbnail creation in script
 - [ ] ... other ...
 
 Problems:
