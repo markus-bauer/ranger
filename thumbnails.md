@@ -27,9 +27,13 @@ Thumbnails are never deleted.
 
 The thumbnail size is hard coded. And, currently, thumbnails are not remade when you change the size. 
 Although they should be updated if the source file changes.
+Note also, that if you delete the thumbnails while ranger is running, they will not be remade (I don't check for this currently).
 
 The thumbnails are drawn with kitty directly (no tempfiles or data transmission).
 So once those files have been created the drawing is more or less immediate.
+
+The existing image preview is not that great. Some of the biggest issues I found are
+with existing code. So if you have issues, first disable the image preview (zi or zp).
 
 --- 
 Todo/Tests:
