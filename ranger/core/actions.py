@@ -1207,7 +1207,7 @@ class Actions(  # pylint: disable=too-many-instance-attributes,too-many-public-m
             return None
 
         # -- thumbnail dict is a 2d dict, similar to previews.
-        # For every entry, there has 3 keys:
+        # For every entry, there are 3 keys:
         #  thumbnail["path"]["loading"] = bool
         #  thumbnail["path"]["failed"] = bool
         #  thumbnail["path"]["thumbnail"] = "path/to/thumbnail.png"

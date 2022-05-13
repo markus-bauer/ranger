@@ -340,7 +340,7 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
 
         if thumbnails:
             (thumb_wid, thumb_hei, thumb_cols, thumb_rows) = get_thumbnail_dimensions()
-            y_line_step = thumb_rows
+            line_step = thumb_rows
             corrected_hei = int(self.hei/thumb_rows)
 
             # thumb position:
@@ -351,7 +351,7 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
                 # no line number:
                 self.thumbnail_x_pos = self.x
         else:
-            y_line_step = 1
+            line_step = 1
             corrected_hei = self.hei
         # ----------------
 
@@ -363,7 +363,7 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
 
         for line_i in range(corrected_hei):
             i = line_i + self.scroll_begin
-            line = line_i * y_line_step
+            line = line_i * line_step
 
             try:
                 drawn = self.target.files[i]

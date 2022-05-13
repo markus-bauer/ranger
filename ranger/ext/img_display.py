@@ -647,7 +647,7 @@ class KittyImageDisplayer(ImageDisplayer, FileManagerAware):
         # a=T: transmit and show
         # z<0: draw the image behind text
         # t=f: draw the file directly
-        # f=100: draw as png
+        # f=100: file is a png
         cmds = ({'a': 'T', 'z': -2, 't': 'f', 'f': 100, 's': width, 'v': height})
 
         payload = base64.standard_b64encode(path.encode(self.fsenc))

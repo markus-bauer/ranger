@@ -34,12 +34,13 @@ case "${MIMETYPE}" in
         create_thumbnail "${FILE_PATH}" "${IMAGE_CACHE_PATH}" && exit 0;;
 
     video/*)
+        # TODO(markus): Don't reuse IMAGE_CACHE_PATH. If there's an issue where a command fails, you'll end up with a badly formatted image at the IMAGE_CACHE_PATH. This will result in that wrong image being drawn as the thumbnail.
         ffmpegthumbnailer -i "${FILE_PATH}" -o "${IMAGE_CACHE_PATH}" -s 0 &&
         create_thumbnail "${IMAGE_CACHE_PATH}" "${IMAGE_CACHE_PATH}" &&
         exit 0;;
 
     audio/*)
-        ffmpeg -i "${FILE_PATH}" -map 0:v -map -0:V -c copy "${IMAGE_CACHE_PATH}" && 
+        ffmpeg -i "${FILE_PATH}" -map 0:v -map -0:V -c copy "${IMAGE_CACHE_PATH}" &&
         create_thumbnail "${IMAGE_CACHE_PATH}" "${IMAGE_CACHE_PATH}" &&
         exit 0;;
 esac
