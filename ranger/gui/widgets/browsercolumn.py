@@ -330,32 +330,31 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
             self.color_reset()
             return
 
-        # Set the size of the linum text field to the number of digits in the
-        # visible files in directory.
-        linum_text_len = len(str(self.scroll_begin + self.hei))
-        linum_format = "{0:>" + str(linum_text_len) + "}"
-
-        # -- thumbnails --
+        # -- thumbnails:
         thumbnails = self.has_thumbnails()
 
         if thumbnails:
             (thumb_wid, thumb_hei, thumb_cols, thumb_rows) = get_thumbnail_dimensions()
             line_step = thumb_rows
             corrected_hei = int(self.hei/thumb_rows)
-
-            # thumb position:
-            if self.settings.line_numbers != 'false' and self.main_column:
-                # put thumbnail to the right of the line number:
-                self.thumbnail_x_pos = self.x + linum_text_len
-            else:
-                # no line number:
-                self.thumbnail_x_pos = self.x
         else:
             line_step = 1
             corrected_hei = self.hei
-        # ----------------
 
         self._set_scroll_begin(corrected_hei)
+
+        # Set the size of the linum text field to the number of digits in the
+        # visible files in directory.
+        linum_text_len = len(str(self.scroll_begin + corrected_hei))
+        linum_format = "{0:>" + str(linum_text_len) + "}"
+
+        # -- thumbnail position:
+        if thumbnails:
+            if self.settings.line_numbers != 'false' and self.main_column:
+                # shift thumbnail to the right of the line number:
+                self.thumbnail_x_pos = self.x + linum_text_len
+            else:
+                self.thumbnail_x_pos = self.x
 
         copied = [f.path for f in self.fm.copy_buffer]
 
