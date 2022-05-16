@@ -371,7 +371,7 @@ class Directory(  # pylint: disable=too-many-instance-attributes,too-many-public
                     self.size = len(filelist)
                     self.infostring = ' %d' % self.size
                 if self.is_link:
-                    self.infostring = '->' + self.infostring
+                    self.infostring = self.infostring
 
                 yield
 
@@ -562,7 +562,7 @@ class Directory(  # pylint: disable=too-many-instance-attributes,too-many-public
     def look_up_cumulative_size(self):
         self.cumulative_size_calculated = True
         self.size = self._get_cumulative_size()
-        self.infostring = ('-> ' if self.is_link else ' ') + human_readable(self.size)
+        self.infostring = ' ' + human_readable(self.size)
 
     @lazy_property
     def size(self):  # pylint: disable=method-hidden
@@ -588,8 +588,6 @@ class Directory(  # pylint: disable=too-many-instance-attributes,too-many-public
     @lazy_property
     def infostring(self):  # pylint: disable=method-hidden
         self.size  # trigger the lazy property initializer pylint: disable=pointless-statement
-        if self.is_link:
-            return '->' + self.infostring
         return self.infostring
 
     @lazy_property

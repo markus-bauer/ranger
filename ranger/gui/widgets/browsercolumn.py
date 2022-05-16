@@ -8,7 +8,9 @@ from __future__ import (absolute_import, division, print_function)
 import curses
 import stat
 from time import time
+import os.path
 from os.path import splitext
+import pathlib
 
 from ranger.ext.widestring import WideString
 from ranger.core import linemode
@@ -52,6 +54,8 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
         self.original_level = level
 
         self.settings.signal_bind('setopt.display_size_in_main_column',
+                                  self.request_redraw, weak=True)
+        self.settings.signal_bind('setopt.show_links_in_browser',
                                   self.request_redraw, weak=True)
 
     def request_redraw(self):
@@ -307,7 +311,8 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
                    drawn.path in copied, tagged_marker, drawn.infostring,
                    drawn.vcsstatus, drawn.vcsremotestatus, self.target.has_vcschild,
                    self.fm.do_cut, current_linemode.name, metakey, active_pane,
-                   self.settings.line_numbers)
+                   self.settings.line_numbers,
+                   self.settings.show_links_in_browser)
 
             # Check if current line has not already computed and cached
             if key in drawn.display_data:
@@ -366,6 +371,16 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
                 space -= vcsstringlen
 
             # info string
+
+            # NOTE(markus): If drawn is a link, then we either append the link,
+            # or prepend '->' to the infostring. So the infostring should have
+            # at least 2 cells reserved.
+            # (Since I removed '->' from the infostring, this acts as if it was there.)
+            if drawn.is_link:
+                reserved_space = 2
+            else:
+                reserved_space = 0
+
             infostring = []
             infostringlen = 0
             try:
@@ -377,14 +392,34 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
                 infostring = self._draw_infostring_display(drawn, space)
             if infostring:
                 infostringlen = self._total_len(infostring)
-                if space - infostringlen > 2:
+                if (space - infostringlen - reserved_space) > 2:
                     predisplay_right = infostring + predisplay_right
                     space -= infostringlen
+                else:
+                    infostring = []
 
-            textstring = self._draw_text_display(text, space)
+            textstring = self._draw_text_display(text, space - reserved_space)
             textstringlen = self._total_len(textstring)
             predisplay_left += textstring
             space -= textstringlen
+
+            if drawn.is_link:
+                # Add the link target if there's enough space.
+                # (Minimum sensible space is 7: ' -> x~ ')
+                if self.settings.show_links_in_browser and (space >= 7):
+                    link_display = self._draw_link(drawn, space)
+                    link_display_len = self._total_len(link_display)
+                    if link_display_len:
+                        space -= link_display_len
+                        predisplay_left += link_display
+                elif infostring:
+                    # There's not enough space. Now we need to insert an arrow at the front of the infostring.
+                    # TODO(markus): Is this too brittle?
+                    #     Can I rely that the infostring is always at that index?
+                    #     The last addition to predisplay_right was the infostring:
+                    #     predisplay_right = infostring + predisplay_right
+                    predisplay_right.insert(0, ["->", []])
+                    space -= 2
 
             assert space >= 0, "Error: there is not enough space to write the text. " \
                 "I have computed spaces wrong."
@@ -504,6 +539,43 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
             this_color.append(drawn.exists and 'good' or 'bad')
 
         return this_color
+
+    def _draw_link(self, drawn, space):
+        link = pathlib.Path(drawn.path)
+
+        # Get the link target (realpath).
+        target = pathlib.Path(drawn.realpath)
+
+        # Make the link target relative to this dir.
+        try:
+            target = target.relative_to(link.parent.resolve())
+        except ValueError:
+            pass
+
+        # Some string manipulations:
+        target_string = str(target)
+
+        # Replace home path with '~'.
+        if target_string.startswith(self.fm.home_path):
+            target_string = '~' + target_string[len(self.fm.home_path):]
+
+        # Append '/' if it's a dir.
+        if target.is_dir():
+            target_string += os.path.sep
+
+        # Shorten link the same way as the file title
+        # (arrow, spaces, and / should not be part of the link that gets shortened.):
+        reserved_space = 5 # ' -> ' + text + ' '
+
+        # NOTE(markus): this should not be able to happen. This function
+        # should only be called if we checked that there's enough space.
+        # Currently, we check for space >= 7.
+        assert reserved_space < space
+
+        link_display = self._draw_text_display(target_string, space - reserved_space)
+        link_display[0][0] = ' -> {}'.format(link_display[0][0])
+
+        return link_display
 
     def _get_scroll_begin(self):  # pylint: disable=too-many-return-statements
         """Determines scroll_begin (the position of the first displayed file)"""

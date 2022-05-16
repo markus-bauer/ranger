@@ -333,7 +333,7 @@ class FileSystemObject(  # pylint: disable=too-many-instance-attributes,too-many
                 self.size = 0
                 self.infostring = '?'
         if self.is_link and not self.is_directory:
-            self.infostring = '->' + self.infostring
+            self.infostring = self.infostring
 
         self.stat = new_stat
         self.last_load_time = time()

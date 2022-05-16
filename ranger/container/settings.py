@@ -76,6 +76,7 @@ ALLOWED_SETTINGS = {
     'show_cursor': bool,  # TODO: not working?
     'show_hidden_bookmarks': bool,
     'show_hidden': bool,
+    'show_links_in_browser': bool,
     'show_selection_in_titlebar': bool,
     'sort_case_insensitive': bool,
     'sort_directories_first': bool,
