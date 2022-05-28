@@ -10,6 +10,7 @@ import stat
 from time import time
 import os.path
 from os.path import splitext
+from os import readlink
 import pathlib
 
 from ranger.ext.widestring import WideString
@@ -406,8 +407,8 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
             if drawn.is_link:
                 # Add the link target if there's enough space.
                 # (Minimum sensible space is 7: ' -> x~ ')
-                if self.settings.show_links_in_browser and (space >= 7):
-                    link_display = self._draw_link(drawn, space)
+                if (space >= 7) and (self.settings.show_links_in_browser in ["link", "resolved"]):
+                    link_display = self._draw_link(drawn, space, self.settings.show_links_in_browser)
                     link_display_len = self._total_len(link_display)
                     if link_display_len:
                         space -= link_display_len
@@ -540,17 +541,25 @@ class BrowserColumn(Pager):  # pylint: disable=too-many-instance-attributes
 
         return this_color
 
-    def _draw_link(self, drawn, space):
+    def _draw_link(self, drawn, space, mode):
         link = pathlib.Path(drawn.path)
 
-        # Get the link target (realpath).
-        target = pathlib.Path(drawn.realpath)
+        # Get the link target:
+        if mode == "link":
+            # Show the immediate link target.
+            target = pathlib.Path(readlink(drawn.path))
+        elif mode == "resolved":
+            # Show the final, fully resolved path of the target.
+            target = pathlib.Path(drawn.realpath)
 
-        # Make the link target relative to this dir.
-        try:
-            target = target.relative_to(link.parent.resolve())
-        except ValueError:
-            pass
+            # Make the link target relative to this dir.
+            try:
+                target = target.relative_to(link.parent.resolve())
+            except ValueError:
+                pass
+        else:
+            # this shouldn't happen
+            raise ValueError("_draw_link called with invalid mode: {}", mode)
 
         # Some string manipulations:
         target_string = str(target)

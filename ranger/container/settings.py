@@ -76,7 +76,7 @@ ALLOWED_SETTINGS = {
     'show_cursor': bool,  # TODO: not working?
     'show_hidden_bookmarks': bool,
     'show_hidden': bool,
-    'show_links_in_browser': bool,
+    'show_links_in_browser': str,
     'show_selection_in_titlebar': bool,
     'sort_case_insensitive': bool,
     'sort_directories_first': bool,
@@ -115,6 +115,7 @@ ALLOWED_VALUES = {
     'preview_images_method': ['w3m', 'iterm2', 'terminology',
                               'urxvt', 'urxvt-full', 'kitty',
                               'ueberzug'],
+    'show_links_in_browser': ['link', 'resolved', 'false'],
     'vcs_backend_bzr': ['disabled', 'local', 'enabled'],
     'vcs_backend_git': ['enabled', 'disabled', 'local'],
     'vcs_backend_hg': ['disabled', 'local', 'enabled'],
